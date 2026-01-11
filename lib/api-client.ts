@@ -21,6 +21,10 @@ export function getAuthHeaders() {
   }
 }
 
+/**
+ * Fonction centrale pour les appels API
+ * CORRIGÉE pour éviter le crash "undefined toString"
+ */
 export async function apiCall(endpoint: string, options: RequestInit = {}) {
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -35,33 +39,50 @@ export async function apiCall(endpoint: string, options: RequestInit = {}) {
     const contentType = response.headers.get("content-type")
     let data: any
 
+    // 1. Tentative de lecture des données (JSON ou Texte)
     if (contentType?.includes("application/json")) {
-      data = await response.json()
-    } else {
-      const text = await response.text()
-      if (!response.ok) {
-        throw new Error(`Server error (${response.status}): Invalid response format`)
+      try {
+        data = await response.json()
+      } catch (e) {
+        data = null // Erreur de parsing JSON
       }
-      return text
+    } else {
+      data = await response.text()
     }
 
+    // 2. Gestion des Erreurs HTTP (400, 401, 500...)
     if (!response.ok) {
-      const errorMessage = data?.message || `API error: ${response.status}`
-      const error: ApiError = {
-        status: response.status,
-        message: errorMessage,
+      // On cherche le message le plus pertinent
+      let errorMessage = `Erreur API (${response.status})`
+
+      let responseBody: any = data
+      if (typeof data === "object" && data !== null) {
+        // Si le backend renvoie { "message": "..." } ou { "error": "..." }
+        errorMessage = data.message || data.error || JSON.stringify(data)
+      } else if (typeof data === "string" && data.length > 0) {
+        // Si le backend renvoie juste du texte brut comme erreur
+        errorMessage = data
       }
-      throw new Error(JSON.stringify(error))
+
+      // Construire une erreur enrichie avec status et body pour faciliter le debug
+      const err: any = new Error(errorMessage)
+      err.status = response.status
+      err.body = responseBody
+      throw err
     }
 
     return data
   } catch (error: any) {
+    // Gestion spécifique si le serveur est éteint
     if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error("Unable to connect to server. Please check your API_BASE_URL.")
+      throw new Error("Impossible de contacter le serveur. Vérifiez que le Backend est lancé.")
     }
+    // On relance l'erreur pour qu'elle soit attrapée par le composant
     throw error
   }
 }
+
+// --- DÉFINITIONS DES API ---
 
 export const authApi = {
   login: (email: string, password: string) =>
@@ -121,16 +142,18 @@ export const userApi = {
 
 export const projetApi = {
   create: (data: any, userId?: number) => {
-    let qs = data && data.groupeId ? `?groupeId=${encodeURIComponent(String(data.groupeId))}` : "";
+    // Some backend endpoints expect groupeId as a request parameter rather than in the JSON body.
+    // If present, include it in the query string and remove it from the body to avoid duplication.
+    let qs = data && data.groupeId ? `?groupeId=${encodeURIComponent(String(data.groupeId))}` : ""
     if (userId) {
-      qs = qs ? `${qs}&idUserConnecter=${encodeURIComponent(String(userId))}` : `?idUserConnecter=${encodeURIComponent(String(userId))}`;
+      qs = qs ? `${qs}&idUserConnecter=${encodeURIComponent(String(userId))}` : `?idUserConnecter=${encodeURIComponent(String(userId))}`
     }
-    const body = { ...data };
-    if (body.groupeId) delete body.groupeId;
+    const body = { ...data }
+    if (body.groupeId) delete body.groupeId
     return apiCall(`/projets/creer${qs}`, {
       method: "POST",
       body: JSON.stringify(body),
-    });
+    })
   },
 
   getAll: () => apiCall("/projets/liste"),
@@ -329,8 +352,8 @@ export const groupeApi = {
     const response = await apiCall(`/groupes/${id}`)
     return response
   },
-  create: async (data: any) => {
-    const response = await apiCall("/groupes", {
+  create: async (data: any, userId: number) => {
+    const response = await apiCall(`/groupes/creer?idUserConnecter=${userId}`, {
       method: "POST",
       body: JSON.stringify(data),
     })
@@ -347,10 +370,16 @@ export const groupeApi = {
     await apiCall(`/groupes/${id}`, { method: "DELETE" })
   },
   addMember: async (id: number, userId: number) => {
-    await apiCall(`/groupes/${id}/membres/${userId}`, { method: "POST" })
+    await apiCall(`/groupes/${id}/membres/ajouter`, { 
+      method: "POST",
+      body: JSON.stringify({ groupeId: id, utilisateurId: userId })
+    })
   },
   removeMember: async (id: number, userId: number) => {
-    await apiCall(`/groupes/${id}/membres/${userId}`, { method: "DELETE" })
+    await apiCall(`/groupes/${id}/membres/supprimer`, { 
+      method: "DELETE",
+      body: JSON.stringify({ groupeId: id, utilisateurId: userId })
+    })
   },
 }
 

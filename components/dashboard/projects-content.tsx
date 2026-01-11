@@ -14,6 +14,7 @@ import { FadeIn } from "@/components/motion/fade-in"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 
+
 export default function ProjectsContent() {
   const router = useRouter()
   const { user, loading } = useAuth()
@@ -85,10 +86,13 @@ export default function ProjectsContent() {
           <h1 className="text-3xl font-bold tracking-tight">Mes Projets</h1>
           <p className="text-muted-foreground">Gérez et suivez l'avancement de vos projets en temps réel.</p>
         </div>
-        <Button className="shadow-lg shadow-primary/20 h-11 px-6 rounded-xl">
-          <Plus className="w-4 h-4 mr-2" />
-          Nouveau Projet
-        </Button>
+        <Button
+  className="shadow-lg shadow-primary/20 h-11 px-6 rounded-xl"
+  onClick={() => router.push("/dashboard/projects/new")}
+>
+  <Plus className="w-4 h-4 mr-2" />
+  Nouveau Projet
+</Button>
       </div>
 
       {/* Search and Filters */}
