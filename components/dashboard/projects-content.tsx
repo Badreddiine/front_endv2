@@ -4,7 +4,8 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
-import { projetApi, type ProjetDTO } from "@/lib/api-client"
+import { projetApi, groupeApi } from "@/lib/api-client"
+// using `any` here because backend DTO shape varies
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, Search, Clock, Users, CheckCircle2, AlertCircle, Filter, MoreVertical, ArrowUpRight } from "lucide-react"
@@ -13,17 +14,45 @@ import { motion, AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/motion/fade-in"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Alert } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import useDashboardStats from "@/hooks/use-dashboard-stats"
+import { Label } from "@/components/ui/label"
 
 
 export default function ProjectsContent() {
   const router = useRouter()
   const { user, loading } = useAuth()
-  const [projects, setProjects] = useState<ProjetDTO[]>([])
-  const [filteredProjects, setFilteredProjects] = useState<ProjetDTO[]>([])
+  const [projects, setProjects] = useState<any[]>([])
+  const [filteredProjects, setFilteredProjects] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("")
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Modal for creating project
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [newProject, setNewProject] = useState<any>({
+    nom: "",
+    description: "",
+    statut: "EN_ATTENTE",
+    groupeId: "",
+  })
+  const [groups, setGroups] = useState<any[]>([])
+  const [isCreating, setIsCreating] = useState(false)
+  const { refresh: refreshDashboardStats } = useDashboardStats()
+
+  useEffect(() => {
+    const fetchGroups = async () => {
+      try {
+        const g = await groupeApi.getAll()
+        setGroups(g || [])
+      } catch (err) {
+        console.error("Erreur fetch groupes", err)
+      }
+    }
+
+    fetchGroups()
+  }, [])
 
   useEffect(() => {
     if (!loading && !user) {
@@ -86,13 +115,72 @@ export default function ProjectsContent() {
           <h1 className="text-3xl font-bold tracking-tight">Mes Projets</h1>
           <p className="text-muted-foreground">Gérez et suivez l'avancement de vos projets en temps réel.</p>
         </div>
-        <Button
-  className="shadow-lg shadow-primary/20 h-11 px-6 rounded-xl"
-  onClick={() => router.push("/dashboard/projects/new")}
->
-  <Plus className="w-4 h-4 mr-2" />
-  Nouveau Projet
-</Button>
+
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogTrigger asChild>
+            <Button className="shadow-lg shadow-primary/20 h-11 px-6 rounded-xl flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Nouveau Projet
+            </Button>
+          </DialogTrigger>
+
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Créer un nouveau projet</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 mt-2">
+              <div>
+                <Label>Nom</Label>
+                <Input value={newProject.nom} onChange={e => setNewProject({ ...newProject, nom: e.target.value })} />
+              </div>
+
+              <div>
+                <Label>Description</Label>
+                <Input value={newProject.description} onChange={e => setNewProject({ ...newProject, description: e.target.value })} />
+              </div>
+
+              <div>
+                <Label>Groupe</Label>
+                <select
+                  value={newProject.groupeId || ""}
+                  onChange={e => setNewProject({ ...newProject, groupeId: e.target.value })}
+                  className="w-full h-10 rounded-md border border-border/50 bg-card text-sm px-2"
+                >
+                  <option value="">-- Aucun (sélectionnez un groupe) --</option>
+                  {groups.map(g => (
+                    <option key={g.id} value={g.id}>{g.nom}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => setIsModalOpen(false)}>Annuler</Button>
+                <Button disabled={isCreating} onClick={async () => {
+                  if (!newProject.nom) return alert("Veuillez saisir un nom de projet.")
+                  if (!newProject.groupeId) return alert("Veuillez sélectionner un groupe.")
+                  setIsCreating(true)
+                  try {
+                    const payload = { nom: newProject.nom, description: newProject.description, groupeId: Number(newProject.groupeId) }
+                    const created = await projetApi.create(payload, user?.id)
+                    setProjects([created, ...projects])
+                    // refresh dashboard cards
+                    try { await refreshDashboardStats() } catch (e) { /* ignore */ }
+                    setIsModalOpen(false)
+                    setNewProject({ nom: "", description: "", statut: "EN_ATTENTE", groupeId: "" })
+                  } catch (err: any) {
+                    console.error("Create project error:", err)
+                    const status = err?.status ? ` (status ${err.status})` : ""
+                    const body = err?.body ? `\nResponse body: ${JSON.stringify(err.body)}` : ""
+                    alert("Erreur création projet" + status + ": " + (err?.message || String(err)) + body)
+                  } finally {
+                    setIsCreating(false)
+                  }
+                }}>Créer</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Search and Filters */}
@@ -168,7 +256,7 @@ export default function ProjectsContent() {
               <p className="text-muted-foreground mb-8 max-w-md mx-auto">
                 Nous n'avons trouvé aucun projet correspondant à vos critères. Essayez de modifier vos filtres ou créez un nouveau projet.
               </p>
-              <Button className="rounded-xl px-8">
+              <Button className="rounded-xl px-8" onClick={() => setIsModalOpen(true)}>
                 Créer mon premier projet
               </Button>
             </CardContent>
@@ -204,7 +292,16 @@ export default function ProjectsContent() {
                               {config.label}
                             </Badge>
                           </div>
-                          <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-full h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              router.push(`/dashboard/projects/${project.id}/edit`)
+                            }}
+                          >
                             <MoreVertical className="w-4 h-4" />
                           </Button>
                         </div>
