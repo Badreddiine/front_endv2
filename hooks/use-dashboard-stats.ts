@@ -56,11 +56,39 @@ export default function useDashboardStats() {
     fetch()
   }, [fetch])
 
+  // Listen for global refresh events so multiple hook instances can sync
+  useEffect(() => {
+    const handler = () => {
+      try {
+        fetch()
+      } catch (err) {
+        console.error("Error handling dashboard:refresh event", err)
+      }
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("dashboard:refresh", handler)
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("dashboard:refresh", handler)
+      }
+    }
+  }, [fetch])
+
   return {
     stats,
     projectStats,
     taskStats,
     isLoading,
     refresh: fetch,
+  }
+}
+
+// Utility to trigger a global dashboard refresh from anywhere in the app
+export function triggerDashboardRefresh() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("dashboard:refresh"))
   }
 }
