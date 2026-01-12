@@ -18,25 +18,25 @@ const montserrat = Montserrat({
 })
 
 export const metadata: Metadata = {
-  title: "ManusApp | Gestion de Projets Professionnelle",
+  title: "collab | Gestion de Projets Professionnelle",
   description: "Une plateforme moderne et intuitive pour gérer vos projets et tâches avec élégance.",
   generator: "Manus",
   icons: {
     icon: [
       {
-        url: "/icon-light-32x32.png",
+        url: "",
         media: "(prefers-color-scheme: light)",
       },
       {
-        url: "/icon-dark-32x32.png",
+        url: "",
         media: "(prefers-color-scheme: dark)",
       },
       {
-        url: "/icon.svg",
-        type: "image/svg+xml",
+        url: "",
+        type: "i",
       },
     ],
-    apple: "/apple-icon.png",
+    apple: "",
   },
 }
 
