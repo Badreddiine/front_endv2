@@ -18,7 +18,7 @@ const montserrat = Montserrat({
 })
 
 export const metadata: Metadata = {
-  title: "ManusApp | Gestion de Projets Professionnelle",
+  title: "CoLab | Gestion de Projets Professionnelle",
   description: "Une plateforme moderne et intuitive pour gérer vos projets et tâches avec élégance.",
   generator: "Manus",
   icons: {
