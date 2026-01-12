@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
-import { tacheApi, projetApi, userApi, type TacheDTO } from "@/lib/api-client"
+import { tacheApi, projetApi, userApi } from "@/lib/api-client"
+// using `any` because backend task DTOs vary
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Plus, Search, AlertCircle, Clock, CheckCircle2, Calendar, MoreHorizontal, GripVertical, Filter } from "lucide-react"
@@ -12,14 +13,15 @@ import { Input } from "@/components/ui/input"
 import { motion, AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/motion/fade-in"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import useDashboardStats from "@/hooks/use-dashboard-stats"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function TasksContent() {
   const router = useRouter()
   const { user, loading } = useAuth()
-  const [tasks, setTasks] = useState<TacheDTO[]>([])
-  const [filteredTasks, setFilteredTasks] = useState<TacheDTO[]>([])
+  const [tasks, setTasks] = useState<any[]>([])
+  const [filteredTasks, setFilteredTasks] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [stateFilter, setStateFilter] = useState<string>("")
   const [isLoading, setIsLoading] = useState(true)
@@ -41,6 +43,7 @@ export default function TasksContent() {
     projet: null,
     assigneA: null,
   })
+  const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD for input `min`
 
   // Redirect si pas connecté
   useEffect(() => {
@@ -105,6 +108,18 @@ export default function TasksContent() {
 
   const handleCreateTask = async () => {
     if (!newTask.titre || !newTask.projet) return
+    // validate start date is not before today
+    if (newTask.dateDebut) {
+      const start = new Date(newTask.dateDebut)
+      const min = new Date(today)
+      // zero time parts to compare date-only
+      start.setHours(0,0,0,0)
+      min.setHours(0,0,0,0)
+      if (start < min) {
+        alert("La date de début ne peut pas être antérieure à la date d'aujourd'hui.")
+        return
+      }
+    }
     try {
       const payload = {
         ...newTask,
@@ -113,6 +128,7 @@ export default function TasksContent() {
       }
       const created = await tacheApi.create(payload)
       setTasks([created, ...tasks])
+      try { await useDashboardStats().refresh() } catch (_) {}
       setIsModalOpen(false)
       setNewTask({
         titre: "",
@@ -171,7 +187,7 @@ export default function TasksContent() {
               <div className="flex gap-2">
                 <div className="flex-1">
                   <Label>Date début</Label>
-                  <Input type="date" value={newTask.dateDebut} onChange={e => setNewTask({ ...newTask, dateDebut: e.target.value })} />
+                  <Input type="date" value={newTask.dateDebut} min={today} onChange={e => setNewTask({ ...newTask, dateDebut: e.target.value })} />
                 </div>
                 <div className="flex-1">
                   <Label>Date fin</Label>
@@ -225,7 +241,7 @@ export default function TasksContent() {
                       <SelectValue placeholder="Projet" />
                     </SelectTrigger>
                     <SelectContent>
-                      {projects.length ? projects.map(p => <SelectItem key={p.id} value={p.id.toString()}>{p.titre}</SelectItem>) : <SelectItem value="">Chargement...</SelectItem>}
+                      {projects.length ? projects.map(p => <SelectItem key={p.id} value={p.id.toString()}>{p.titre}</SelectItem>) : <SelectItem value="__loading__">Chargement...</SelectItem>}
                     </SelectContent>
                   </Select>
                 </div>
@@ -243,7 +259,7 @@ export default function TasksContent() {
                       <SelectValue placeholder="Utilisateur" />
                     </SelectTrigger>
                     <SelectContent>
-                      {users.length ? users.map(u => <SelectItem key={u.id} value={u.id.toString()}>{u.nom} {u.prenom}</SelectItem>) : <SelectItem value="">Chargement...</SelectItem>}
+                      {users.length ? users.map(u => <SelectItem key={u.id} value={u.id.toString()}>{u.nom} {u.prenom}</SelectItem>) : <SelectItem value="__loading__">Chargement...</SelectItem>}
                     </SelectContent>
                   </Select>
                 </div>
