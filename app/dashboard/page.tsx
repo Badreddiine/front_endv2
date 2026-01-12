@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
-import { projetApi, tacheApi } from "@/lib/api-client"
+import useDashboardStats from "@/hooks/use-dashboard-stats"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import ProfileCard from "@/components/dashboard/profile-card"
@@ -15,74 +15,13 @@ import { FadeIn } from "@/components/motion/fade-in"
 export default function DashboardPage() {
   const router = useRouter()
   const { user, loading } = useAuth()
-  const [stats, setStats] = useState({
-    totalProjects: 0,
-    totalTasks: 0,
-    completedTasks: 0,
-    inProgressTasks: 0,
-  })
-  const [projectStats, setProjectStats] = useState<any[]>([])
-  const [taskStats, setTaskStats] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { stats, projectStats, taskStats, isLoading, refresh } = useDashboardStats()
 
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login")
     }
   }, [user, loading, router])
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setIsLoading(true)
-        const [projects, tasks] = await Promise.all([projetApi.getAll(), tacheApi.getAll()])
-
-        const projectData = projects || []
-        const taskData = tasks || []
-
-        setStats({
-          totalProjects: projectData.length,
-          totalTasks: taskData.length,
-          completedTasks: taskData.filter((t: any) => t.etat === "TERMINE").length,
-          inProgressTasks: taskData.filter((t: any) => t.etat === "EN_COURS").length,
-        })
-
-        // Project status distribution
-        const projectStatusCount = projectData.reduce((acc: any, p: any) => {
-          acc[p.statut] = (acc[p.statut] || 0) + 1
-          return acc
-        }, {})
-
-        setProjectStats(
-          Object.entries(projectStatusCount).map(([status, count]: [string, any]) => ({
-            name: status,
-            value: count,
-          })),
-        )
-
-        // Task status distribution
-        const taskStatusCount = taskData.reduce((acc: any, t: any) => {
-          acc[t.etat] = (acc[t.etat] || 0) + 1
-          return acc
-        }, {})
-
-        setTaskStats(
-          Object.entries(taskStatusCount).map(([status, count]: [string, any]) => ({
-            name: status === "A_FAIRE" ? "À faire" : status === "EN_COURS" ? "En cours" : "Terminé",
-            value: count,
-          })),
-        )
-      } catch (err) {
-        console.error("[v0] Error fetching stats:", err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    if (user) {
-      fetchStats()
-    }
-  }, [user])
 
   if (loading || isLoading) {
     return (
@@ -220,7 +159,13 @@ export default function DashboardPage() {
 
         <div className="space-y-8">
           <FadeIn delay={0.2} direction="left">
-            <ProfileCard user={user} />
+            <ProfileCard
+              user={user}
+              totalProjects={stats.totalProjects}
+              totalTasks={stats.totalTasks}
+              totalGroups={stats.totalGroups}
+              score={stats.totalTasks > 0 ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : 0}
+            />
           </FadeIn>
 
           <FadeIn delay={0.5} direction="left">
