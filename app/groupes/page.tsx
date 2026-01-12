@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect } from "react"
@@ -9,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Plus, Users, Search, Filter, ArrowRight, Globe, Lock, Calendar } from "lucide-react"
+import { AlertCircle, Plus, Users, Search, Filter, ArrowRight, Globe, Lock } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { FadeIn } from "@/components/motion/fade-in"
 import { motion, AnimatePresence } from "framer-motion"
@@ -29,9 +28,9 @@ export default function GroupesPage() {
   useEffect(() => {
     if (searchQuery) {
       setFilteredGroupes(
-        groupes.filter(g => 
-          g.nom.toLowerCase().includes(searchQuery.toLowerCase()) || 
-          g.description.toLowerCase().includes(searchQuery.toLowerCase())
+        groupes.filter(g =>
+          g.nom?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          g.description?.toLowerCase().includes(searchQuery.toLowerCase())
         )
       )
     } else {
@@ -48,8 +47,10 @@ export default function GroupesPage() {
       setCurrentUser(user)
 
       const groupesData = await groupeApi.getAll()
-      setGroupes(groupesData)
-      setFilteredGroupes(groupesData)
+      // Filtrer uniquement les groupes avec id
+      const validGroupes = groupesData.filter(g => g.id)
+      setGroupes(validGroupes)
+      setFilteredGroupes(validGroupes)
     } catch (err: any) {
       setError(err.message || "Échec du chargement des groupes")
     } finally {
@@ -74,17 +75,23 @@ export default function GroupesPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-4xl font-extrabold tracking-tight">Groupes de Travail</h1>
-          <p className="text-muted-foreground mt-2 text-lg">Explorez et gérez les groupes et leurs projets collaboratifs.</p>
+          <p className="text-muted-foreground mt-2 text-lg">
+            Explorez et gérez les groupes et leurs projets collaboratifs.
+          </p>
         </div>
+
+        {/* Bouton Créer un groupe */}
         {currentUser?.validForProjectOperation && !currentUser?.guest && (
-          <Button className="rounded-xl h-12 px-6 shadow-lg shadow-primary/20 gap-2">
-            <Plus className="h-5 w-5" />
-            Créer un groupe
-          </Button>
+          <Link href="/dashboard/groups/new">
+            <Button className="rounded-xl h-12 px-6 shadow-lg shadow-primary/20 gap-2">
+              <Plus className="h-5 w-5" />
+              Créer un groupe
+            </Button>
+          </Link>
         )}
       </div>
 
-      {/* Search and Filters */}
+      {/* Search */}
       <div className="flex gap-4 flex-col md:flex-row items-center">
         <div className="w-full md:flex-1 relative group">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -92,7 +99,7 @@ export default function GroupesPage() {
             type="text"
             placeholder="Rechercher un groupe..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={e => setSearchQuery(e.target.value)}
             className="pl-10 h-12 bg-card border-border/50 rounded-xl focus:ring-2 focus:ring-primary/10 transition-all"
           />
         </div>
@@ -102,6 +109,7 @@ export default function GroupesPage() {
         </Button>
       </div>
 
+      {/* Error */}
       {error && (
         <Alert variant="destructive" className="rounded-xl">
           <AlertCircle className="h-4 w-4" />
@@ -113,7 +121,7 @@ export default function GroupesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         <AnimatePresence mode="popLayout">
           {filteredGroupes.length === 0 ? (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="col-span-full text-center py-20 bg-secondary/10 rounded-3xl border-2 border-dashed border-border/50"
@@ -124,7 +132,7 @@ export default function GroupesPage() {
             </motion.div>
           ) : (
             filteredGroupes.map((groupe, index) => {
-              const isMember = groupe.membres?.some((m) => m.id === currentUser?.id)
+              const isMember = groupe.membres?.some(m => m.id === currentUser?.id)
 
               return (
                 <FadeIn key={groupe.id} delay={index * 0.05} direction="up">
@@ -144,9 +152,7 @@ export default function GroupesPage() {
                         </Badge>
                       </div>
                       <CardTitle className="text-2xl font-bold group-hover:text-primary transition-colors">{groupe.nom}</CardTitle>
-                      <CardDescription className="mt-3 line-clamp-2 text-sm leading-relaxed">
-                        {groupe.description}
-                      </CardDescription>
+                      <CardDescription className="mt-3 line-clamp-2 text-sm leading-relaxed">{groupe.description}</CardDescription>
                     </CardHeader>
                     <CardContent className="flex-1 flex flex-col justify-end pt-0">
                       <div className="space-y-6">
@@ -167,12 +173,14 @@ export default function GroupesPage() {
                           )}
                         </div>
 
-                        <Link href={`/groupes/${groupe.id}`} className="block">
-                          <Button className="w-full rounded-2xl h-12 font-bold group-hover:shadow-lg group-hover:shadow-primary/20 transition-all">
-                            Voir les projets
-                            <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                          </Button>
-                        </Link>
+                        {/* Lien vers les projets */}
+                        {groupe.id && (
+                          <Link href={`/dashboard/groups/${groupe.id}`} className="block">
+                            <Button className="w-full rounded-2xl h-12 font-bold group-hover:shadow-lg group-hover:shadow-primary/20 transition-all">
+                              Voir les projets
+                            </Button>
+                          </Link>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
