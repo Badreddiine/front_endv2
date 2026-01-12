@@ -27,6 +27,15 @@ export function getAuthHeaders() {
  */
 export async function apiCall(endpoint: string, options: RequestInit = {}) {
   try {
+    // Debugging: log POST payloads to ListeDiffusion for easier server-side mapping
+    try {
+      const isListe = endpoint.toLowerCase().includes("listediffusion")
+      const opts = { ...options }
+      if (isListe && opts.method === "POST") {
+        try { console.debug("[apiCall] POST to", endpoint, "body:", opts.body) } catch {}
+      }
+    } catch {}
+
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       credentials: "include",
@@ -457,41 +466,46 @@ export const evenementApi = {
 
 export const listeDiffusionApi = {
   getAll: async () => {
-    const response = await apiCall("/listes-diffusion")
+    const response = await apiCall("/ListeDiffusion")
     return response
   },
   getById: async (id: number) => {
-    const response = await apiCall(`/listes-diffusion/${id}`)
+    const response = await apiCall(`/ListeDiffusion/${id}`)
     return response
   },
   create: async (data: any) => {
-    const response = await apiCall("/listes-diffusion", {
+    try {
+      console.debug("[listeDiffusionApi.create] payload:", data)
+    } catch {}
+    const response = await apiCall("/ListeDiffusion", {
       method: "POST",
       body: JSON.stringify(data),
+      
     })
+    console.log("Creating ListeDiffusion with data:", data)
     return response
   },
   update: async (id: number, data: any) => {
-    const response = await apiCall(`/listes-diffusion/${id}`, {
+    const response = await apiCall(`/ListeDiffusion/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     })
     return response
   },
   delete: async (id: number) => {
-    await apiCall(`/listes-diffusion/${id}`, { method: "DELETE" })
+    await apiCall(`/ListeDiffusion/${id}`, { method: "DELETE" })
   },
   addMember: async (id: number, userId: number) => {
-    await apiCall(`/listes-diffusion/${id}/membres/${userId}`, { method: "POST" })
+    await apiCall(`/ListeDiffusion/${id}/membres/${userId}`, { method: "POST" })
   },
   removeMember: async (id: number, userId: number) => {
-    await apiCall(`/listes-diffusion/${id}/membres/${userId}`, { method: "DELETE" })
+    await apiCall(`/ListeDiffusion/${id}/membres/${userId}`, { method: "DELETE" })
   },
   addAdmin: async (id: number, userId: number) => {
-    await apiCall(`/listes-diffusion/${id}/administrateurs/${userId}`, { method: "POST" })
+    await apiCall(`/ListeDiffusion/${id}/administrateurs/${userId}`, { method: "POST" })
   },
   removeAdmin: async (id: number, userId: number) => {
-    await apiCall(`/listes-diffusion/${id}/administrateurs/${userId}`, { method: "DELETE" })
+    await apiCall(`/ListeDiffusion/${id}/administrateurs/${userId}`, { method: "DELETE" })
   },
 }
 
